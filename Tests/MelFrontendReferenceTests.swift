@@ -21,6 +21,7 @@
 
 import XCTest
 import MLX
+import MLXAudioSTT
 
 @testable import MLXAudioCore
 
@@ -35,15 +36,19 @@ final class MelFrontendReferenceTests: XCTestCase {
     /// Qwen3-ASR path (slaney mel + periodic hann) must reproduce the
     /// WhisperFeatureExtractor reference values.
     func testQwen3FrontendMatchesWhisperFeatureExtractor() throws {
-        let mel = computeMelSpectrogram(
-            audio: referenceSignal(), sampleRate: 16000, nFft: 400, hopLength: 160,
+        let signal = referenceSignal()
+        let batch = computeMelSpectrogram(
+            audio: signal, sampleRate: 16000, nFft: 400, hopLength: 160,
             nMels: 128, melScale: .slaney, hannPeriodic: true)
-        // mel is [numFrames, nMels]; the reference layout is [nMels, numFrames].
-        XCTAssertEqual(mel.dim(1), 128)
-        let features = mel.transposed(1, 0).asArray(Float.self)
-        let frames = mel.dim(0)
         // WhisperFeatureExtractor returns samples / hop frames (1600 / 160).
-        XCTAssertEqual(frames, 10)
+        XCTAssertEqual(batch.dim(0), 10)
+
+        let samples = signal.asArray(Float.self)
+        let frontend = IncrementalMelSpectrogram()
+        let chunks = [samples[..<1024], samples[1024...]].compactMap {
+            frontend.process(samples: Array($0))
+        }
+        let streaming = MLX.concatenated(chunks, axis: 0)
 
         let reference: [Int: [Float]] = [
             0: [0.907520, 0.395512, -0.514646, -0.514646],
@@ -53,11 +58,17 @@ final class MelFrontendReferenceTests: XCTestCase {
             64: [0.413674, -0.094624, -0.514646, -0.514646],
             100: [0.065004, -0.444576, -0.514646, -0.514646],
         ]
-        for (bin, values) in reference.sorted(by: { $0.key < $1.key }) {
-            for (t, expected) in values.enumerated() {
-                let actual = features[bin * frames + t]
-                XCTAssertEqual(actual, expected, accuracy: 2e-3,
-                               "mel bin \(bin) frame \(t) drifted from WhisperFeatureExtractor reference")
+        for (name, mel) in [("batch", batch), ("streaming", streaming)] {
+            XCTAssertEqual(mel.dim(1), 128)
+            let features = mel.transposed(1, 0).asArray(Float.self)
+            let frames = mel.dim(0)
+            XCTAssertGreaterThanOrEqual(frames, 4)
+            for (bin, values) in reference.sorted(by: { $0.key < $1.key }) {
+                for (t, expected) in values.enumerated() {
+                    let actual = features[bin * frames + t]
+                    XCTAssertEqual(actual, expected, accuracy: 2e-3,
+                                   "\(name) mel bin \(bin) frame \(t) drifted from WhisperFeatureExtractor reference")
+                }
             }
         }
     }

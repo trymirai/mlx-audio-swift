@@ -52,12 +52,13 @@ public class IncrementalMelSpectrogram {
         self.nMels = nMels
         self.overlapSize = nFft - hopLength
 
-        self.window = hanningWindow(size: nFft)
+        self.window = hanningWindow(size: nFft, periodic: true)
         self.filters = melFilters(
             sampleRate: sampleRate,
             nFft: nFft,
             nMels: nMels,
-            norm: "slaney"
+            norm: "slaney",
+            melScale: .slaney
         )
     }
 
