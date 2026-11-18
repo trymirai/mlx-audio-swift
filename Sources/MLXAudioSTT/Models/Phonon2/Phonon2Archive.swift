@@ -1,6 +1,8 @@
 import CryptoKit
 import Foundation
+#if PhononArchives
 import libzstd
+#endif
 
 /// Reader for the checksummed tar/Zstandard transport used by published Phonon checkpoints.
 enum Phonon2Archive {
@@ -26,8 +28,7 @@ enum Phonon2Archive {
         guard expectedBytes > 0, expectedBytes <= 1 << 30 else {
             throw invalid("Invalid unpacked size")
         }
-        let compressed = try Data(contentsOf: archive, options: .mappedIfSafe)
-        let tar = try decompress(compressed, limit: expectedBytes + (16 << 20))
+        let tar = try decompress(archive, limit: expectedBytes + (16 << 20))
         var cursor = 0
         var files: [String: Manifest.File]?
         var seen = Set<String>()
@@ -153,7 +154,9 @@ enum Phonon2Archive {
         }
     }
 
-    private static func decompress(_ data: Data, limit: Int) throws -> Data {
+    private static func decompress(_ archive: URL, limit: Int) throws -> Data {
+        #if PhononArchives
+        let data = try Data(contentsOf: archive, options: .mappedIfSafe)
         guard let stream = ZSTD_createDStream() else {
             throw invalid("Could not allocate Zstandard decoder")
         }
@@ -187,6 +190,9 @@ enum Phonon2Archive {
             } while remaining != 0
         }
         return output
+        #else
+        throw invalid("Compressed checkpoints require the PhononArchives package trait")
+        #endif
     }
 
     private static func text(_ data: Data) -> String {

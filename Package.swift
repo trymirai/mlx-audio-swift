@@ -59,6 +59,10 @@ let package = Package(
         ),
 
     ],
+    traits: [
+        .default(enabledTraits: ["PhononArchives"]),
+        .trait(name: "PhononArchives", description: "Load Zstandard-compressed Phonon checkpoints."),
+    ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift.git", .upToNextMajor(from: "0.33.0")),
         .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMajor(from: "1.1.6")),
@@ -158,7 +162,8 @@ let package = Package(
             name: "MLXAudioSTT",
             dependencies: [
                 "MLXAudioCore",
-                .product(name: "libzstd", package: "zstd"),
+                .product(
+                    name: "libzstd", package: "zstd", condition: .when(traits: ["PhononArchives"])),
                 "MLXAudioCodecs",
                 "MLXAudioVAD",
                 .product(name: "MLX", package: "mlx-swift"),
@@ -319,7 +324,8 @@ let package = Package(
             name: "MLXAudioTests",
             dependencies: [
                 "MLXAudioCore",
-                .product(name: "libzstd", package: "zstd"),
+                .product(
+                    name: "libzstd", package: "zstd", condition: .when(traits: ["PhononArchives"])),
                 "MLXAudioCodecs",
                 "MLXAudioTTS",
                 "MLXAudioSTT",

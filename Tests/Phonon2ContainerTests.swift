@@ -2,7 +2,9 @@ import Foundation
 import HuggingFace
 import MLX
 import Testing
+#if PhononArchives
 import libzstd
+#endif
 
 @testable import MLXAudioSTT
 
@@ -157,6 +159,8 @@ struct Phonon2ContainerTests {
             try Phonon2Archive.joinBytePlanes(Data([1]), transform: transform)
         }
     }
+
+    #if PhononArchives
     private func archive(_ members: [(String, Data)], at directory: URL) throws -> URL {
         let rows = members.map {
             [
@@ -226,5 +230,15 @@ struct Phonon2ContainerTests {
             try Phonon2Archive.extract(url, to: output, expectedBytes: 5)
         }
     }
-
+    #else
+    @Test func compressedArchiveRequiresPackageTrait() throws {
+        let directory = try directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let archive = directory.appendingPathComponent("test.bps.tar.zst")
+        let output = directory.appendingPathComponent("output")
+        #expect(throws: Phonon2Error.self) {
+            try Phonon2Archive.extract(archive, to: output, expectedBytes: 1)
+        }
+    }
+    #endif
 }
